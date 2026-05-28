@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="副業管理">
+<title>副業管理アプリ</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+:root{
+  --bg:#f0f2f7;--surface:#fff;--surface2:#e8ecf5;
+  --accent:#2563eb;--accent2:#ea6c00;--green:#16a34a;--red:#dc2626;
+  --text:#1a1d2e;--muted:#6b7280;--border:#d1d5e0;--radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:80px;}
+.app-header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px 0;position:sticky;top:0;z-index:100;}
+.app-title{font-size:12px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;font-family:'DM Mono',monospace;margin-bottom:10px;}
+.tabs{display:flex;}
+.tab{flex:1;padding:10px 6px;text-align:center;font-size:13px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.page{display:none;padding:14px;}
+.page.active{display:block;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;}
+.card-title{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;font-family:'DM Mono',monospace;margin-bottom:10px;}
+.month-bar{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;}
+.month-label{font-family:'DM Mono',monospace;font-size:16px;font-weight:500;}
+.month-btn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;}
+.summary-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.summary-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;}
+.summary-box .val{font-family:'DM Mono',monospace;font-size:20px;font-weight:500;color:var(--green);display:block;}
+.summary-box .lbl{font-size:10px;color:var(--muted);margin-top:2px;}
+.form-label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;}
+.form-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font-size:15px;font-family:'Noto Sans JP',sans-serif;-webkit-appearance:none;margin-bottom:10px;box-sizing:border-box;}
+.form-input:focus{outline:none;border-color:var(--accent);}
+textarea.form-input{resize:vertical;min-height:52px;}
+.selected-display{background:var(--surface2);border:2px solid var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:10px;display:none;align-items:center;justify-content:space-between;}
+.selected-display.visible{display:flex;}
+.selected-name{font-size:14px;font-weight:600;color:var(--accent);}
+.clear-btn{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;}
+.parent-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.parent-chip{background:var(--surface2);border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text);white-space:nowrap;font-family:'Noto Sans JP',sans-serif;}
+.parent-chip.has-sub::after{content:' ›';color:var(--muted);}
+.parent-chip.new-chip{border-style:dashed;color:var(--accent2);border-color:var(--accent2);}
+.price-toggle{display:flex;gap:7px;margin-bottom:10px;}
+.price-btn{flex:1;padding:11px;border-radius:9px;border:2px solid var(--border);background:var(--surface2);color:var(--muted);font-size:15px;font-weight:700;font-family:'DM Mono',monospace;cursor:pointer;text-align:center;}
+.price-btn.selected{border-color:var(--accent);background:rgba(37,99,235,.1);color:var(--accent);}
+.btn{width:100%;padding:13px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-success{background:var(--green);color:#fff;}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.backup-row{display:flex;gap:7px;}
+.backup-row>*{flex:1;}
+.import-lbl{display:flex;align-items:center;justify-content:center;padding:13px;border-radius:10px;border:1px solid var(--border);color:var(--muted);font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;}
+.task-item{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:var(--surface);border-radius:10px;margin-bottom:7px;border:1px solid var(--border);border-left:4px solid var(--accent);}
+.task-item.p4{border-left-color:var(--accent2);}
+.task-date{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:2px;}
+.task-course{font-size:13px;font-weight:500;}
+.task-price{font-family:'DM Mono',monospace;font-size:15px;font-weight:600;}
+.task-price.c3{color:var(--accent);}.task-price.c4{color:var(--accent2);}
+.task-del{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 8px;margin-left:4px;}
+.sub-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:flex-end;}
+.sub-overlay.open{display:flex;}
+.sub-box{background:var(--surface);border-radius:20px 20px 0 0;padding:18px 14px 30px;width:100%;max-height:65vh;overflow-y:auto;}
+.sub-title{font-size:12px;color:var(--muted);text-align:center;margin-bottom:12px;}
+.sub-title strong{color:var(--text);font-size:16px;display:block;margin-top:3px;}
+.sub-list{display:flex;flex-direction:column;gap:7px;}
+.sub-item{background:var(--surface2);border:1.5px solid var(--border);border-radius:11px;padding:12px 14px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:9px;}
+.sub-dot{width:7px;height:7px;border-radius:50%;background:var(--border);flex-shrink:0;}
+.sub-cancel{margin-top:10px;width:100%;padding:12px;border-radius:11px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:14px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;}
+.confirm-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center;padding:20px;}
+.confirm-ov.open{display:flex;}
+.confirm-box{background:var(--surface);border-radius:14px;padding:22px 18px;width:100%;max-width:300px;text-align:center;}
+.confirm-msg{font-size:14px;font-weight:500;margin-bottom:14px;line-height:1.5;}
+.confirm-btns{display:flex;gap:8px;}
+.confirm-btns>*{flex:1;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--green);color:#fff;padding:10px 20px;border-radius:20px;font-weight:700;font-size:13px;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.empty{text-align:center;padding:30px;color:var(--muted);font-size:13px;}
+.inv-section{background:#fff;border-radius:var(--radius);padding:16px;margin-bottom:10px;border:1px solid var(--border);}
+.inv-title{font-size:22px;font-weight:700;letter-spacing:7px;text-align:center;border-bottom:2px solid #1a1a2e;padding-bottom:10px;margin-bottom:12px;}
+.inv-table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px;}
+.inv-table th{background:#1a1a2e;color:#fff;padding:5px 7px;text-align:left;font-weight:500;}
+.inv-table td{padding:5px 7px;border-bottom:1px solid #eee;color:#333;}
+.inv-table tr:nth-child(even) td{background:#f8f9ff;}
+.flex-row{display:flex;gap:8px;}.flex-row>*{flex:1;}
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-title">副業管理アプリ</div>
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="record">📋 記録</div>
+    <div class="tab" data-tab="list">📊 一覧</div>
+    <div class="tab" data-tab="invoice">🧾 請求書</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 記録タブ -->
+<div class="page active" id="page-record">
+  <div class="month-bar">
+    <button class="month-btn" data-delta="-1">‹</button>
+    <span class="month-label" id="ml1"></span>
+    <button class="month-btn" data-delta="1">›</button>
+  </div>
+  <div class="summary-row">
+    <div class="summary-box"><span class="val" id="sc1">0件</span><div class="lbl">件数</div></div>
+    <div class="summary-box"><span class="val" id="sa1">¥0</span><div class="lbl">合計</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">新規タスク追加</div>
+    <label class="form-label">日付</label>
+    <input type="date" class="form-input" id="inp-date">
+    <label class="form-label">コース選択</label>
+    <div class="selected-display" id="sel-disp">
+      <span class="selected-name" id="sel-name"></span>
+      <button class="clear-btn" id="clear-btn">×</button>
+    </div>
+    <div class="parent-grid" id="parent-grid"></div>
+    <label class="form-label">金額</label>
+    <div class="price-toggle">
+      <div class="price-btn selected" data-price="3000">¥3,000</div>
+      <div class="price-btn" data-price="4000">¥4,000</div>
+    </div>
+    <label class="form-label">メモ（任意）</label>
+    <textarea class="form-input" id="inp-memo" placeholder="備考など"></textarea>
+    <button class="btn btn-primary" id="add-btn">＋ 追加する</button>
+  </div>
+</div>
+
+<!-- 一覧タブ -->
+<div class="page" id="page-list">
+  <div class="month-bar">
+    <button class="month-btn" data-delta="-1">‹</button>
+    <span class="month-label" id="ml2"></span>
+    <button class="month-btn" data-delta="1">›</button>
+  </div>
+  <div class="summary-row">
+    <div class="summary-box"><span class="val" id="sc2">0件</span><div class="lbl">件数</div></div>
+    <div class="summary-box"><span class="val" id="sa2">¥0</span><div class="lbl">合計</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">データ管理</div>
+    <div class="backup-row">
+      <button class="btn btn-outline" id="exp-btn">📥 エクスポート</button>
+      <label class="import-lbl">📤 インポート<input type="file" accept=".json" id="imp-input" style="display:none"></label>
+    </div>
+  </div>
+  <div id="task-list"></div>
+</div>
+
+<!-- 請求書タブ -->
+<div class="page" id="page-invoice">
+  <div class="card">
+    <div class="card-title">請求書情報</div>
+    <div class="flex-row">
+      <div><label class="form-label">請求書番号</label><input type="text" class="form-input" id="inv-num" placeholder="例: 2026-05"></div>
+      <div><label class="form-label">請求日</label><input type="date" class="form-input" id="inv-date"></div>
+    </div>
+    <label class="form-label">支払期限</label>
+    <input type="date" class="form-input" id="inv-due">
+    <label class="form-label">請求先会社名</label>
+    <input type="text" class="form-input" id="inv-to" placeholder="例：進藤運輸倉庫有限会社">
+    <label class="form-label">請求先住所</label>
+    <input type="text" class="form-input" id="inv-addr" placeholder="住所">
+    <label class="form-label">発行者名</label>
+    <input type="text" class="form-input" id="inv-from" placeholder="氏名">
+    <label class="form-label">振込先・連絡先</label>
+    <textarea class="form-input" id="inv-info" placeholder="口座情報・TELなど"></textarea>
+    <label class="form-label">対象月</label>
+    <div class="month-bar" style="margin-bottom:0;background:var(--surface2);">
+      <button class="month-btn" data-delta="-1">‹</button>
+      <span class="month-label" id="ml3"></span>
+      <button class="month-btn" data-delta="1">›</button>
+    </div>
+  </div>
+  <button class="btn btn-success" id="gen-btn" style="margin-bottom:10px;">🧾 請求書を生成</button>
+  <div id="inv-preview" style="display:none;">
+    <div class="inv-section" id="inv-content"></div>
+    <button class="btn btn-primary" id="print-btn">🖨️ 印刷 / PDF保存</button>
+  </div>
+</div>
+
+<!-- サブポップアップ -->
+<div class="sub-overlay" id="sub-overlay">
+  <div class="sub-box">
+    <div class="sub-title">コースを選択<strong id="sub-lbl"></strong></div>
+    <div class="sub-list" id="sub-list"></div>
+    <button class="sub-cancel" id="sub-cancel">キャンセル</button>
+  </div>
+</div>
+
+<!-- 削除確認 -->
+<div class="confirm-ov" id="confirm-ov">
+  <div class="confirm-box">
+    <div class="confirm-msg">このタスクを削除しますか？</div>
+    <div class="confirm-btns">
+      <button class="btn btn-outline" id="conf-cancel">キャンセル</button>
+      <button class="btn btn-primary" id="conf-ok" style="background:var(--red);">削除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_GROUPS=[
+  {parent:"筑紫",courses:["筑紫下2福南上1","筑紫下2補助","筑紫下3上2"]},
+  {parent:"博多南",courses:["博多南下7上4","博多南下6上3","博多南下回送上8"]},
+  {parent:"福南",courses:["福南下補助2上"]},
+  {parent:"城南",courses:["城南下3上1"]},
+  {parent:"行橋",courses:["行橋下2上1"]},
+  {parent:"和白",courses:["和白下1補助","和白下5上4","和白下補助3上"]},
+  {parent:"直方",courses:["直方補助下1上1","直方下3上2"]},
+  {parent:"前原",courses:["前原下4上3"]},
+  {parent:"福岡",courses:["福岡下9上6","福岡上8","福岡上14"]},
+  {parent:"博多北",courses:["博多北上9"]},
+  {parent:"伊田",courses:["伊田下1"]},
+  {parent:"福間",courses:["福間下補助"]},
+  {parent:"宗像",courses:["宗像下5上4"]},
+  {parent:"飯塚",courses:["飯塚上3"]},
+  {parent:"筑紫野",courses:["筑紫野下補助"]},
+  {parent:"福西",courses:["福西補助下上"]},
+  {parent:"福岡東",courses:["福岡東下補助上2","福岡東下4上1"]},
+  {parent:"福岡西",courses:["福岡西下2"]},
+  {parent:"福岡中央",courses:["福岡中央下11上13"]}
+];
+
+const SKEY='fukugyou_v3';
+function load(){try{const s=localStorage.getItem(SKEY);if(s){const p=JSON.parse(s);return{tasks:p.tasks||[],groups:p.groups||JSON.parse(JSON.stringify(DEFAULT_GROUPS))};}}catch(e){}return{tasks:[],groups:JSON.parse(JSON.stringify(DEFAULT_GROUPS))};}
+function save(){try{localStorage.setItem(SKEY,JSON.stringify({tasks:st.tasks,groups:st.groups}));}catch(e){}}
+
+const now=new Date();
+const loaded=load();
+const st={year:now.getFullYear(),month:now.getMonth()+1,price:3000,course:'',tasks:loaded.tasks,groups:loaded.groups};
+
+// 初期日付
+(function(){
+  const y=now.getFullYear(),m=String(now.getMonth()+1).padStart(2,'0'),d=String(now.getDate()).padStart(2,'0');
+  document.getElementById('inp-date').value=`${y}-${m}-${d}`;
+  document.getElementById('inv-date').value=`${y}-${m}-${d}`;
+  const last=new Date(y,now.getMonth()+1,0);
+  document.getElementById('inv-due').value=`${y}-${m}-${String(last.getDate()).padStart(2,'0')}`;
+})();
+
+function ml(){return`${st.year}年${st.month}月`;}
+function fmtDate(s){if(!s)return'';const d=new Date(s+'T00:00:00');return`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;}
+function getMonthTasks(){return st.tasks.filter(t=>{const d=new Date(t.date);return d.getFullYear()===st.year&&(d.getMonth()+1)===st.month;}).sort((a,b)=>new Date(a.date)-new Date(b.date));}
+
+function renderAll(){
+  ['ml1','ml2','ml3'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=ml();});
+  const tasks=getMonthTasks();
+  const cnt=tasks.length,amt=tasks.reduce((s,t)=>s+t.price,0);
+  document.getElementById('sc1').textContent=cnt+'件';
+  document.getElementById('sa1').textContent='¥'+amt.toLocaleString();
+  document.getElementById('sc2').textContent=cnt+'件';
+  document.getElementById('sa2').textContent='¥'+amt.toLocaleString();
+  renderList(tasks);
+}
+
+function renderGrid(){
+  const grid=document.getElementById('parent-grid');
+  grid.innerHTML='';
+  st.groups.forEach(g=>{
+    const chip=document.createElement('div');
+    chip.className='parent-chip'+(g.courses.length>1?' has-sub':'');
+    chip.textContent=g.parent;
+    chip.onclick=()=>g.courses.length>1?openSub(g):selectCourse(g.courses[0]);
+    grid.appendChild(chip);
+  });
+  const add=document.createElement('div');
+  add.className='parent-chip new-chip';
+  add.textContent='＋ 追加';
+  add.onclick=addCourse;
+  grid.appendChild(add);
+}
+
+function selectCourse(name){
+  st.course=name;
+  document.getElementById('sel-name').textContent=name;
+  document.getElementById('sel-disp').classList.add('visible');
+  closeSub();
+}
+function clearCourse(){st.course='';document.getElementById('sel-disp').classList.remove('visible');}
+
+function openSub(g){
+  document.getElementById('sub-lbl').textContent=g.parent;
+  const list=document.getElementById('sub-list');
+  list.innerHTML='';
+  g.courses.forEach(c=>{
+    const item=document.createElement('div');
+    item.className='sub-item';
+    item.innerHTML=`<div class="sub-dot"></div><span>${c}</span>`;
+    item.onclick=()=>selectCourse(c);
+    list.appendChild(item);
+  });
+  document.getElementById('sub-overlay').classList.add('open');
+}
+function closeSub(){document.getElementById('sub-overlay').classList.remove('open');}
+
+function addCourse(){
+  const name=window.prompt('コース名を入力\n例: 筑紫下2博多北上1');
+  if(!name?.trim())return;
+  const parent=window.prompt('グループ名を入力\n例: 筑紫（新規グループも可）');
+  if(!parent?.trim())return;
+  const n=name.trim(),p=parent.trim();
+  const ex=st.groups.find(g=>g.parent===p);
+  if(ex){if(!ex.courses.includes(n))ex.courses.push(n);}
+  else{st.groups.push({parent:p,courses:[n]});}
+  save();renderGrid();selectCourse(n);
+  toast('✅ コースを追加しました！');
+}
+
+document.getElementById('add-btn').onclick=function(){
+  const date=document.getElementById('inp-date').value;
+  const memo=document.getElementById('inp-memo').value.trim();
+  if(!date){toast('❌ 日付を選択してください',true);return;}
+  if(!st.course){toast('❌ コースを選択してください',true);return;}
+  st.tasks.push({id:Date.now(),date,course:st.course,price:st.price,memo});
+  save();
+  document.getElementById('inp-memo').value='';
+  clearCourse();
+  renderAll();
+  toast('✅ 追加しました！');
+};
+
+function renderList(tasks){
+  const c=document.getElementById('task-list');
+  if(!tasks.length){c.innerHTML='<div class="empty">📭 この月のタスクはありません</div>';return;}
+  c.innerHTML=tasks.map(t=>`<div class="task-item${t.price===4000?' p4':''}">
+    <div>
+      <div class="task-date">${fmtDate(t.date)}</div>
+      <div class="task-course">${t.course}</div>
+      ${t.memo?`<div style="font-size:10px;color:var(--muted);margin-top:1px">${t.memo}</div>`:''}
+    </div>
+    <div style="display:flex;align-items:center">
+      <span class="task-price ${t.price===3000?'c3':'c4'}">¥${t.price.toLocaleString()}</span>
+      <button class="task-del" data-id="${t.id}">×</button>
+    </div>
+  </div>`).join('');
+}
+
+let pendingDel=null;
+document.getElementById('task-list').addEventListener('click',function(e){
+  const btn=e.target.closest('.task-del');
+  if(!btn)return;
+  pendingDel=Number(btn.dataset.id);
+  document.getElementById('confirm-ov').classList.add('open');
+});
+document.getElementById('conf-ok').onclick=function(){
+  if(pendingDel){st.tasks=st.tasks.filter(t=>t.id!==pendingDel);save();renderAll();toast('🗑️ 削除しました');}
+  pendingDel=null;document.getElementById('confirm-ov').classList.remove('open');
+};
+document.getElementById('conf-cancel').onclick=function(){pendingDel=null;document.getElementById('confirm-ov').classList.remove('open');};
+
+document.getElementById('tabs').addEventListener('click',function(e){
+  const tab=e.target.closest('.tab');if(!tab)return;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  ['record','list','invoice'].forEach(name=>{
+    document.getElementById('page-'+name).classList.toggle('active',tab.dataset.tab===name);
+  });
+  renderAll();
+});
+
+document.querySelectorAll('.month-btn').forEach(btn=>btn.addEventListener('click',function(){
+  const d=Number(this.dataset.delta);
+  st.month+=d;
+  if(st.month>12){st.month=1;st.year++;}
+  if(st.month<1){st.month=12;st.year--;}
+  renderAll();
+}));
+
+document.querySelectorAll('.price-btn').forEach(btn=>btn.addEventListener('click',function(){
+  st.price=Number(this.dataset.price);
+  document.querySelectorAll('.price-btn').forEach(b=>b.classList.toggle('selected',b===this));
+}));
+
+document.getElementById('clear-btn').onclick=clearCourse;
+document.getElementById('sub-cancel').onclick=closeSub;
+document.getElementById('sub-overlay').onclick=function(e){if(e.target===this)closeSub();};
+
+document.getElementById('exp-btn').onclick=function(){
+  const blob=new Blob([JSON.stringify({tasks:st.tasks,groups:st.groups},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`fukugyou_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  toast('✅ エクスポートしました');
+};
+document.getElementById('imp-input').addEventListener('change',function(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(!Array.isArray(data.tasks))throw new Error();
+      st.tasks=data.tasks;
+      st.groups=data.groups||JSON.parse(JSON.stringify(DEFAULT_GROUPS));
+      save();renderGrid();renderAll();toast('✅ データを復元しました！');
+    }catch{toast('❌ 読み込みに失敗しました',true);}
+  };
+  reader.readAsText(file);e.target.value='';
+});
+
+document.getElementById('gen-btn').onclick=function(){
+  const tasks=getMonthTasks();
+  if(!tasks.length){toast('❌ この月にタスクがありません',true);return;}
+  const num=document.getElementById('inv-num').value||`${st.year}-${String(st.month).padStart(2,'0')}`;
+  const invDate=document.getElementById('inv-date').value;
+  const due=document.getElementById('inv-due').value;
+  const toName=document.getElementById('inv-to').value;
+  const addr=document.getElementById('inv-addr').value;
+  const fromName=document.getElementById('inv-from').value;
+  const info=document.getElementById('inv-info').value;
+  const total=tasks.reduce((s,t)=>s+t.price,0);
+  const rows=tasks.map(t=>`<tr><td>${fmtDate(t.date)}</td><td>${t.course}</td><td style="text-align:right">1</td><td style="text-align:right">¥${t.price.toLocaleString()}</td><td style="text-align:right">¥${t.price.toLocaleString()}</td></tr>`).join('');
+  document.getElementById('inv-content').innerHTML=`
+    <div class="inv-title">請 求 書</div>
+    <div style="text-align:center;font-size:10px;color:#888;margin-top:-8px;margin-bottom:12px">No. ${num}</div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:10px;color:#444">
+      <div>請求日: ${fmtDate(invDate)}</div><div>支払期限: ${fmtDate(due)}</div>
+    </div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:2px">${toName} 御中</div>
+    ${addr?`<div style="font-size:10px;color:#666;margin-bottom:10px">${addr}</div>`:''}
+    ${fromName?`<div style="text-align:right;font-size:12px;font-weight:700;margin-bottom:3px">${fromName}</div>`:''}
+    ${info?`<div style="text-align:right;font-size:10px;color:#555;white-space:pre-line;margin-bottom:8px">${info}</div>`:''}
+    <div style="background:#f0f4ff;border-radius:7px;padding:10px;text-align:center;margin-bottom:10px">
+      <div style="font-size:10px;color:#666">${ml()} 業務委託費 合計</div>
+      <div style="font-size:24px;font-weight:700;font-family:'DM Mono',monospace">¥${total.toLocaleString()}</div>
+    </div>
+    <table class="inv-table">
+      <thead><tr><th>日付</th><th>コース</th><th style="text-align:right">数量</th><th style="text-align:right">単価</th><th style="text-align:right">金額</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;padding-top:7px;border-top:2px solid #1a1d2e">
+      <span style="font-size:12px;font-weight:700;margin-right:12px">合計金額</span>
+      <span style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700">¥${total.toLocaleString()}</span>
+    </div>`;
+  document.getElementById('inv-preview').style.display='block';
+  document.getElementById('inv-content').scrollIntoView({behavior:'smooth'});
+};
+
+document.getElementById('print-btn').onclick=function(){
+  const content=document.getElementById('inv-content').innerHTML;
+  const win=window.open('','_blank');
+  win.document.write(`<html><head><meta charset="UTF-8"><title>請求書</title>
+    <style>body{font-family:'Noto Sans JP',sans-serif;margin:20px;color:#1a1a2e}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
+    th{background:#1a1a2e;color:#fff;padding:6px 8px;text-align:left}
+    td{padding:6px 8px;border-bottom:1px solid #eee}
+    tr:nth-child(even) td{background:#f8f9ff}</style></head><body>${content}</body></html>`);
+  win.document.close();win.print();
+};
+
+function toast(msg,isErr){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.style.background=isErr?'var(--red)':'var(--green)';
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+renderGrid();
+renderAll();
+</script>
+</body>
+</html>
