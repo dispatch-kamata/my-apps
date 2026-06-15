@@ -412,7 +412,7 @@ function closeData(){document.getElementById('dataOverlay').classList.remove('sh
 function exportData(){
   const blob=new Blob([JSON.stringify({tasks},null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=`tasks_${new Date().toISOString().slice(0,10)}.json`;
+  const a=document.createElement('a');a.href=url;a.download='tasks-backup.json';
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
   setLastExport();closeData();toast('✅ バックアップを保存しました');
 }

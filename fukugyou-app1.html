@@ -705,7 +705,7 @@ document.getElementById('manage-overlay').onclick=function(e){if(e.target===this
 document.getElementById('exp-btn').onclick=function(){
   const blob=new Blob([JSON.stringify({tasks:st.tasks,groups:st.groups},null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=`fukugyou_${new Date().toISOString().slice(0,10)}.json`;
+  const a=document.createElement('a');a.href=url;a.download='fukugyou-backup.json';
   document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
   toast('✅ バックアップを保存しました');
   setLastExport();
