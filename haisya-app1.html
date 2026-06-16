@@ -233,18 +233,34 @@
   .run-time { font-size: 13px; font-weight: 700; color: #374151; }
   .run-time b { color: var(--blue2); }
 
-  /* 重複警告 */
-  .driver-group.conflict { border-left-color: var(--red); }
+  /* 重複警告（赤＝重大／黄＝要注意15分以内） */
+  .driver-group.warn-red    { border-left-color: var(--red); }
+  .driver-group.warn-yellow { border-left-color: #f59e0b; }
   .conflict-banner {
-    background: #fee2e2; color: var(--red);
     font-size: 12px; font-weight: 800;
     border-radius: 8px; padding: 7px 10px;
     margin: 8px 0 4px;
   }
-  .assign-route-line.conflict { background: #fff1f2; }
-  .assign-route-line.conflict .t,
-  .assign-route-line.conflict > span:last-child { color: var(--red); font-weight: 700; }
-  .assign-car.conflict { background: #fee2e2; color: var(--red); }
+  .conflict-banner.red    { background: #fee2e2; color: var(--red); }
+  .conflict-banner.yellow { background: #fef3c7; color: #92400e; }
+  .assign-route-line.red    { background: #fff1f2; }
+  .assign-route-line.red .t,
+  .assign-route-line.red > span:last-child { color: var(--red); font-weight: 700; }
+  .assign-route-line.yellow { background: #fffbeb; }
+  .assign-route-line.yellow .t,
+  .assign-route-line.yellow > span:last-child { color: #92400e; font-weight: 700; }
+  .assign-car.red    { background: #fee2e2; color: var(--red); }
+  .assign-car.yellow { background: #fef3c7; color: #92400e; }
+
+  /* ドライバー用ページ作成ボタン */
+  .share-btn {
+    display: block; width: 100%;
+    padding: 14px; margin-bottom: 14px;
+    border: none; border-radius: 14px;
+    background: #06c755; color: #fff;
+    font: inherit; font-size: 15px; font-weight: 800;
+    -webkit-tap-highlight-color: transparent;
+  }
 
   .day-summary {
     display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
@@ -288,7 +304,7 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v1.3</span>
+  <span class="ver" id="verLabel">v1.4</span>
   <h1>🚌 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
@@ -331,6 +347,7 @@
 
     <button class="rinji-toggle" id="rinjiToggle">⚡ 臨時便・増便を追加する</button>
     <div class="rinji-form" id="rinjiForm">
+      <p id="rinjiTitle" style="font-size:13px;font-weight:800;color:#92400e;margin-bottom:10px;">⚡ 臨時便・増便を登録</p>
       <div class="full">
         <label class="lbl">便名</label>
         <input type="text" id="rName" placeholder="例：福岡臨時下3" />
@@ -364,6 +381,8 @@
     <div class="stat"><small>手当合計</small><strong id="sAllow">¥0</strong></div>
   </div>
 
+  <button class="share-btn" id="shareViewBtn">📲 ドライバー用ページを作成（LINE共有）</button>
+
   <h2 style="font-size:15px;font-weight:800;margin:4px 0 10px;">📋 この日の配車一覧</h2>
   <div id="list"></div>
 
@@ -379,7 +398,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '1.3';
+  const APP_VERSION = '1.4';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -444,6 +463,7 @@
   let customRoutes = loadCustom();
   let selected = [];
   let editingId = null;
+  let editingCustom = null;   // 編集中の臨時便名
 
   function loadCustom() {
     try { return JSON.parse(localStorage.getItem(CUSTOM_KEY)) || []; }
@@ -507,7 +527,7 @@
       const used = usedNames.has(r.name);
       const aCls = r.allowance >= 5000 ? 'a5000' : r.allowance >= 4000 ? 'a4000' : '';
       const time = r.start ? `${r.start}〜${r.end}` : '時間自由';
-      const del  = isCustom ? `<span onclick="event.stopPropagation();delCustom('${esc(r.name)}')" style="font-size:12px;color:#9ca3af;padding:4px 6px;">✕削除</span>` : '';
+      const del  = isCustom ? `<span onclick="event.stopPropagation();editCustom('${esc(r.name)}')" style="font-size:13px;color:var(--blue2);padding:4px 6px;font-weight:700;">✏️</span><span onclick="event.stopPropagation();delCustom('${esc(r.name)}')" style="font-size:12px;color:#9ca3af;padding:4px 6px;">✕</span>` : '';
       return `<div class="route-btn ${sel?'selected':''} ${used&&!sel?'used':''}" onclick="toggleRoute('${esc(r.name)}')">
         <span>
           <span class="r-name">${esc(r.name)}</span><br>
@@ -548,6 +568,21 @@
     toast('臨時便を削除したよ');
   };
 
+  // 登録済み臨時便の編集（時間・金額・便名を修正）
+  window.editCustom = function(name) {
+    const r = customRoutes.find(c => c.name === name);
+    if (!r) return;
+    editingCustom = name;
+    $('rName').value  = r.name;
+    $('rStart').value = r.start || '';
+    $('rEnd').value   = r.end || '';
+    $('rAllow').value = r.allowance;
+    $('rinjiForm').classList.add('open');
+    $('rinjiAdd').textContent = '✏️ この臨時便を更新';
+    $('rinjiTitle').textContent = `✏️ 臨時便「${name}」を編集`;
+    $('rName').scrollIntoView({ behavior:'smooth', block:'center' });
+  };
+
   window.removeSel = function(i) {
     selected.splice(i, 1);
     renderSelected(); renderRoutes();
@@ -584,21 +619,54 @@
   }
 
   // ── 臨時便フォーム ─────────────────────────────────
-  $('rinjiToggle').onclick = () => $('rinjiForm').classList.toggle('open');
+  function resetRinjiForm() {
+    editingCustom = null;
+    $('rName').value = ''; $('rStart').value = ''; $('rEnd').value = ''; $('rAllow').value = '3000';
+    $('rinjiAdd').textContent = 'この臨時便を選択に追加';
+    $('rinjiTitle').textContent = '⚡ 臨時便・増便を登録';
+  }
+  $('rinjiToggle').onclick = () => {
+    const willOpen = !$('rinjiForm').classList.contains('open');
+    if (willOpen) resetRinjiForm();
+    $('rinjiForm').classList.toggle('open');
+  };
   $('rinjiAdd').onclick = () => {
     const name = $('rName').value.trim();
     if (!name) { toast('臨時便の便名を入れてね'); return; }
-    if (MASTER_NAMES.has(name) || customRoutes.some(r => r.name === name)) {
-      toast('同じ便名がもうあるよ。リストから選んでね'); return;
-    }
     const route = {
       name, start: $('rStart').value, end: $('rEnd').value,
       allowance: Number($('rAllow').value) || 3000
     };
+
+    if (editingCustom) {
+      // ── 既存の臨時便を更新 ──
+      if (name !== editingCustom && (MASTER_NAMES.has(name) || customRoutes.some(r => r.name === name))) {
+        toast('その便名は既にあるよ'); return;
+      }
+      const idx = customRoutes.findIndex(c => c.name === editingCustom);
+      if (idx >= 0) customRoutes[idx] = route;
+      // 選択中で旧名を使っていれば同期
+      selected.forEach(s => {
+        if (s.rinji && s.name === editingCustom) {
+          s.name = route.name; s.start = route.start; s.end = route.end; s.allowance = route.allowance;
+        }
+      });
+      saveCustom();
+      resetRinjiForm();
+      $('rinjiForm').classList.remove('open');
+      renderSelected(); renderRoutes();
+      toast('✏️ 臨時便を更新したよ');
+      return;
+    }
+
+    // ── 新規登録 ──
+    if (MASTER_NAMES.has(name) || customRoutes.some(r => r.name === name)) {
+      toast('同じ便名がもうあるよ。リストから選んでね'); return;
+    }
     customRoutes.push(route);
     saveCustom();
     selected.push({ ...route, rinji: true });
-    $('rName').value = ''; $('rStart').value = ''; $('rEnd').value = ''; $('rAllow').value = '3000';
+    resetRinjiForm();
     $('rinjiForm').classList.remove('open');
     renderSelected(); renderRoutes();
     toast('⚡ 臨時便を登録＆選択したよ');
@@ -649,7 +717,8 @@
   $('clearBtn').onclick = clearForm;
 
   // ── 重複検出（時間・車両）────────────────────────
-  // 戻り値: Map(routeオブジェクト -> Set('driver'|'car'))
+  // ルール: 重なり>15分=赤(重大)／重なり〜15分 or 間隔<15分=黄(要注意)
+  // 戻り値: Map(routeオブジェクト -> {level:'red'|'yellow', types:Set})
   function detectDayConflicts(items) {
     const flat = [];
     items.forEach(it => it.routes.forEach(r => {
@@ -657,14 +726,25 @@
       if (s < 9999 && e < 9999 && e > s) flat.push({ it, r, s, e });
     }));
     const map = new Map();
-    const add = (r, type) => { if (!map.has(r)) map.set(r, new Set()); map.get(r).add(type); };
+    const add = (r, level, type) => {
+      if (!map.has(r)) map.set(r, { level, types:new Set() });
+      const o = map.get(r);
+      o.types.add(type);
+      if (level === 'red') o.level = 'red';
+    };
     for (let i = 0; i < flat.length; i++) {
       for (let j = i + 1; j < flat.length; j++) {
         const a = flat[i], b = flat[j];
-        if (a.s < b.e && b.s < a.e) { // 時間が重なる
-          if (a.it.driver === b.it.driver) { add(a.r, 'driver'); add(b.r, 'driver'); }
-          if (a.it.car && a.it.car === b.it.car) { add(a.r, 'car'); add(b.r, 'car'); }
-        }
+        const sameDriver = a.it.driver === b.it.driver;
+        const sameCar    = a.it.car && a.it.car === b.it.car;
+        if (!sameDriver && !sameCar) continue;
+        const overlap = Math.min(a.e, b.e) - Math.max(a.s, b.s); // 正=重なり/負=間隔
+        let level = null;
+        if (overlap > 15) level = 'red';        // 15分超の重なり=重大
+        else if (overlap > -15) level = 'yellow'; // 重なり〜15分 or 間隔15分未満=要注意
+        if (!level) continue;
+        if (sameDriver) { add(a.r, level, 'driver'); add(b.r, level, 'driver'); }
+        if (sameCar)    { add(a.r, level, 'car');    add(b.r, level, 'car'); }
       }
     }
     return map;
@@ -693,23 +773,34 @@
       }, 0);
       const total = allRoutes.reduce((s, r) => s + (r.allowance||0), 0);
       const minS = Math.min(...allRoutes.map(r => toMin(r.start)));
-      return { driver, its, runMin, total, minS };
+      const isFree = allRoutes.some(r => r.name.includes('フリー'));
+      return { driver, its, runMin, total, minS, isFree };
     });
-    arr.sort((a,b) => a.minS - b.minS);
+    // フリー便は必ず一番上、その後は出発が早い順
+    arr.sort((a,b) => {
+      if (a.isFree !== b.isFree) return a.isFree ? -1 : 1;
+      return a.minS - b.minS;
+    });
 
     $('list').innerHTML = arr.map(g => {
-      // この人の重複種別を集計
+      // この人の重複レベル・種別を集計
       const types = new Set();
+      let worst = null; // 'red' | 'yellow'
       g.its.forEach(it => it.routes.forEach(r => {
-        if (conflicts.has(r)) conflicts.get(r).forEach(t => types.add(t));
+        if (conflicts.has(r)) {
+          const c = conflicts.get(r);
+          c.types.forEach(t => types.add(t));
+          if (c.level === 'red') worst = 'red';
+          else if (!worst) worst = 'yellow';
+        }
       }));
-      const hasConflict = types.size > 0;
       let banner = '';
-      if (hasConflict) {
+      if (worst) {
         const msgs = [];
-        if (types.has('driver')) msgs.push('⏰ 運行時間が重複');
-        if (types.has('car'))    msgs.push('🚐 車両が他と重複');
-        banner = `<div class="conflict-banner">⚠️ ${msgs.join('　/　')}！確認してね</div>`;
+        if (types.has('driver')) msgs.push('⏰ 運行時間が接近/重複');
+        if (types.has('car'))    msgs.push('🚐 車両が他と接近/重複');
+        const head = worst === 'red' ? '⚠️ 重複しています' : '⚠️ 15分以内で接近';
+        banner = `<div class="conflict-banner ${worst}">${head}：${msgs.join('　/　')}</div>`;
       }
 
       // 各配車（車両ごと）— 早い順
@@ -719,20 +810,25 @@
         return am - bm;
       }).map(it => {
         const routes = [...it.routes].sort((a,b) => toMin(a.start) - toMin(b.start));
-        const carConflict = it.routes.some(r => conflicts.has(r) && conflicts.get(r).has('car'));
+        let carLv = null;
+        it.routes.forEach(r => {
+          if (conflicts.has(r) && conflicts.get(r).types.has('car')) {
+            if (conflicts.get(r).level === 'red') carLv = 'red'; else if (!carLv) carLv = 'yellow';
+          }
+        });
         const lines = routes.map((r,i) => {
           const t = r.start ? `${r.start}〜${r.end}` : '時間未定';
-          const cf = conflicts.has(r) ? 'conflict' : '';
-          return `<div class="assign-route-line ${cf}">
+          const lv = conflicts.has(r) ? conflicts.get(r).level : '';
+          return `<div class="assign-route-line ${lv}">
             <span class="num">${'①②③④⑤⑥⑦⑧'[i]||'・'}</span>
             <span class="t">${t}</span>
-            <span>${esc(r.name)}${r.rinji?'<span class="rinji-mark">⚡臨時</span>':''}${cf?' ⚠️':''}</span>
+            <span>${esc(r.name)}${r.rinji?'<span class="rinji-mark">⚡臨時</span>':''}${lv?' ⚠️':''}</span>
           </div>`;
         }).join('');
         const carLabel = it.car ? `🚐 ${esc(it.car)}` : '🚐 車両未設定';
         return `<div class="assign-sub">
           <div class="assign-sub-head">
-            <span class="assign-car ${carConflict?'conflict':''}">${carLabel}</span>
+            <span class="assign-car ${carLv||''}">${carLabel}</span>
             <span style="font-size:11px;color:var(--gray);">${it.routes.length}便</span>
           </div>
           ${lines}
@@ -744,11 +840,14 @@
       }).join('');
 
       const carCount = g.its.length > 1 ? `<span style="font-size:11px;color:var(--orange);font-weight:700;">🔁 ${g.its.length}台乗継</span>` : '';
+      // フリー便は「拘束時間」、それ以外は「運行時間」
+      const tLabel = g.isFree ? '🕐 拘束時間' : '🚌 運行時間';
       const runLabel = g.runMin > 0
-        ? `🚌 運行時間 <b>${Math.floor(g.runMin/60)}時間${String(g.runMin%60).padStart(2,'0')}分</b>`
-        : '🚌 運行時間 —';
+        ? `${tLabel} <b>${Math.floor(g.runMin/60)}時間${String(g.runMin%60).padStart(2,'0')}分</b>`
+        : `${tLabel} —`;
+      const groupCls = worst === 'red' ? 'warn-red' : worst === 'yellow' ? 'warn-yellow' : '';
 
-      return `<div class="driver-group ${hasConflict?'conflict':''}">
+      return `<div class="driver-group ${groupCls}">
         <div class="driver-top">
           <span class="driver-name">👤 ${esc(g.driver)} ${carCount}</span>
         </div>
@@ -854,6 +953,38 @@
     };
     reader.readAsText(file);
   });
+
+  // ── ドライバー用ページのURLを生成して共有 ──────────
+  function buildViewURL() {
+    const items = dayItems();
+    const date = $('fDate').value;
+    // 手当は含めない・コンパクトな形式に圧縮
+    const compact = {
+      d: date,
+      a: items.map(it => ({
+        n: it.driver,
+        c: it.car || '',
+        r: [...it.routes].sort((x,y)=>toMin(x.start)-toMin(y.start)).map(r => [r.name, r.start, r.end])
+      }))
+    };
+    const json = JSON.stringify(compact);
+    const b64 = btoa(unescape(encodeURIComponent(json))); // 日本語OKのbase64
+    const base = location.href.replace(/[^/]*(\?.*)?(#.*)?$/, '');
+    return base + 'haisya-view.html#d=' + b64;
+  }
+  $('shareViewBtn').onclick = () => {
+    if (!dayItems().length) { toast('この日の配車がまだないよ'); return; }
+    const url = buildViewURL();
+    if (navigator.share) {
+      navigator.share({ title:'配車表', text:`${$('fDate').value} の配車表`, url })
+        .catch(() => copyText(url));
+    } else copyText(url);
+  };
+  function copyText(t) {
+    navigator.clipboard.writeText(t)
+      .then(() => toast('📋 URLをコピーしたよ！LINEに貼って送ってね'))
+      .catch(() => prompt('このURLをコピーしてLINEに貼ってね', t));
+  }
 
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
