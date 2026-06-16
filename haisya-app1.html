@@ -261,6 +261,33 @@
     font: inherit; font-size: 15px; font-weight: 800;
     -webkit-tap-highlight-color: transparent;
   }
+  .share-btn:disabled { opacity: .6; }
+
+  /* 共有モーダル */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,.5);
+    display: none; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: #fff; border-radius: 18px;
+    padding: 22px; width: 100%; max-width: 380px;
+  }
+  .modal-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+  .modal-sub { font-size: 12px; color: var(--gray); margin-bottom: 14px; }
+  .modal-url {
+    background: #f3f4f6; border-radius: 10px;
+    padding: 12px; font-size: 15px; font-weight: 700;
+    color: var(--blue2); word-break: break-all;
+    text-align: center; margin-bottom: 14px;
+  }
+  .modal-close {
+    width: 100%; padding: 10px; margin-top: 8px;
+    background: none; border: none; color: var(--gray);
+    font: inherit; font-size: 13px;
+  }
 
   .day-summary {
     display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
@@ -304,7 +331,7 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v1.7</span>
+  <span class="ver" id="verLabel">v1.8</span>
   <h1>🚌 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
@@ -395,10 +422,21 @@
 </div>
 <input type="file" id="importFile" accept=".json,application/json" style="display:none;" />
 
+<div class="modal-overlay" id="shareModal">
+  <div class="modal-box">
+    <p class="modal-title">📲 ドライバー用リンク</p>
+    <p class="modal-sub">このリンクをLINEで全員に送ってね（短縮済み）</p>
+    <div class="modal-url" id="modalUrl"></div>
+    <button class="btn btn-primary" id="modalShareBtn">📲 LINEで送る</button>
+    <button class="btn btn-secondary" id="modalCopyBtn" style="margin-top:8px;">📋 リンクをコピー</button>
+    <button class="modal-close" id="modalCloseBtn">閉じる</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '1.7';
+  const APP_VERSION = '1.8';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -975,21 +1013,38 @@
     const base = location.href.replace(/[^/]*(\?.*)?(#.*)?$/, '');
     return base + 'haisya-view.html?d=' + b64;
   }
-  // ★タップ直後に同期実行（iOSのLINE共有が動く条件）
-  $('shareViewBtn').onclick = () => {
+  // da.gd で短縮（github.io対応・CORS OK）。失敗時は元URL
+  async function shortenURL(longUrl) {
+    try {
+      const res = await fetch('https://da.gd/s?url=' + encodeURIComponent(longUrl));
+      const txt = (await res.text()).trim();
+      return /^https?:\/\//.test(txt) ? txt : longUrl;
+    } catch { return longUrl; }
+  }
+
+  let currentShareUrl = '';
+  $('shareViewBtn').onclick = async () => {
     if (!dayItems().length) { toast('この日の配車がまだないよ'); return; }
-    const url = buildViewURL();
+    const btn = $('shareViewBtn');
+    btn.disabled = true; btn.textContent = '🔗 リンク作成中…';
+    currentShareUrl = await shortenURL(buildViewURL());
+    btn.disabled = false; btn.textContent = '📲 ドライバー用ページを作成（LINE共有）';
+    $('modalUrl').textContent = currentShareUrl;
+    $('shareModal').classList.add('open');
+  };
+  // モーダル内のボタンは「新しいタップ」なのでiOSでも共有が動く
+  $('modalShareBtn').onclick = () => {
     const text = `🚌 ${$('fDate').value} の配車表`;
     if (navigator.share) {
-      navigator.share({ title:'配車表', text, url }).catch(() => {});
-    } else {
-      copyText(url);
-    }
+      navigator.share({ title:'配車表', text, url: currentShareUrl }).catch(() => {});
+    } else copyShare();
   };
-  function copyText(t) {
-    navigator.clipboard.writeText(t)
-      .then(() => toast('📋 URLをコピーしたよ！LINEに貼って送ってね'))
-      .catch(() => prompt('このURLをコピーしてLINEに貼ってね', t));
+  $('modalCopyBtn').onclick = copyShare;
+  $('modalCloseBtn').onclick = () => $('shareModal').classList.remove('open');
+  function copyShare() {
+    navigator.clipboard.writeText(currentShareUrl)
+      .then(() => toast('📋 コピーしたよ！LINEに貼って送ってね'))
+      .catch(() => prompt('このリンクをコピーしてLINEに貼ってね', currentShareUrl));
   }
 
   function esc(s) {
