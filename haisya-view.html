@@ -74,6 +74,12 @@
   }
   .rbody { flex: 1; }
   .rtime { font-size: 20px; font-weight: 800; color: #111; display: block; }
+  .rcar {
+    font-size: 14px; font-weight: 800;
+    background: #eef2ff; color: var(--blue2);
+    padding: 2px 10px; border-radius: 8px; margin-left: 10px;
+    white-space: nowrap;
+  }
   .rname { font-size: 22px; font-weight: 800; color: #1f2937; display: block; margin-top: 2px; }
   .rname .free-mark { font-size: 14px; color: #ef6c00; font-weight: 800; }
 
@@ -152,29 +158,37 @@
   } else {
     document.getElementById('dateLabel').textContent = formatDate(data.d);
 
-    // フリー便を一番上、その後は出発の早い順
-    const arr = data.a.map(it => {
-      const rs = it.r.map(expandRoute);
-      const minS = Math.min(...rs.map(x => toMin(x.start)));
-      const isFree = rs.some(x => x.name.includes('フリー'));
-      const runMin = rs.reduce((s, x) => {
+    // 同名ドライバーをまとめる（車両を乗り継ぐ場合も1つのカードに）
+    const groups = {};
+    data.a.forEach(it => { (groups[it.n] = groups[it.n] || []).push(it); });
+
+    const arr = Object.entries(groups).map(([n, list]) => {
+      // 各配車の便を車両付きで展開し、時間順にまとめる
+      const routes = list.flatMap(a => a.r.map(expandRoute).map(r => ({ ...r, car: a.c })))
+        .sort((x,y) => toMin(x.start) - toMin(y.start));
+      const cars = [...new Set(list.map(a => a.c).filter(Boolean))];
+      const minS = Math.min(...routes.map(x => toMin(x.start)));
+      const isFree = routes.some(x => x.name.includes('フリー'));
+      const runMin = routes.reduce((s, x) => {
         const st = toMin(x.start), en = toMin(x.end);
         return (st < 9999 && en < 9999 && en > st) ? s + (en - st) : s;
       }, 0);
-      return { n: it.n, c: it.c, rs, minS, isFree, runMin };
+      return { n, cars, routes, minS, isFree, runMin };
     });
     arr.sort((a,b) => (a.isFree !== b.isFree) ? (a.isFree ? -1 : 1) : a.minS - b.minS);
 
     document.getElementById('list').innerHTML = arr.map(it => {
-      const routes = [...it.rs].sort((a,b) => toMin(a.start) - toMin(b.start));
-      const lines = routes.map((x, i) => {
-        const { name, start, end } = x;
+      const multiCar = it.cars.length > 1;
+      const lines = it.routes.map((x, i) => {
+        const { name, start, end, car } = x;
         const t = start ? `${start} 〜 ${end}` : '時間未定';
         const free = name.includes('フリー') ? '<span class="free-mark">（フリー）</span>' : '';
+        // 乗り継ぎがある人は各便に車両を表示
+        const carTag = (multiCar && car) ? `<span class="rcar">🚐 ${esc(car)}</span>` : '';
         return `<div class="rline">
-          <span class="rnum">${'①②③④⑤⑥⑦⑧⑨⑩'[i] || '・'}</span>
+          <span class="rnum">${'①②③④⑤⑥⑦⑧⑨⑩⑪⑫'[i] || '・'}</span>
           <span class="rbody">
-            <span class="rtime">${esc(t)}</span>
+            <span class="rtime">${esc(t)}${carTag}</span>
             <span class="rname">${esc(name)}${free}</span>
           </span>
         </div>`;
@@ -182,7 +196,9 @@
       const tLabel = it.isFree ? '🕐 拘束時間' : '🚌 運行時間';
       const runTxt = it.runMin > 0
         ? `${tLabel} ${Math.floor(it.runMin/60)}時間${String(it.runMin%60).padStart(2,'0')}分` : '';
-      const carHtml = it.c ? `<span class="dcar">🚐 ${esc(it.c)}</span>` : '';
+      // 車両ラベル：1台ならそのまま、複数なら「3433 / 4786」
+      const carHtml = it.cars.length
+        ? `<span class="dcar">🚐 ${esc(it.cars.join(' / '))}</span>` : '';
       return `<div class="dcard ${it.isFree?'free':''}">
         <div class="dhead">
           <span class="dname">${esc(it.n)}</span>
