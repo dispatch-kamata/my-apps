@@ -82,6 +82,13 @@
   }
   .rname { font-size: 22px; font-weight: 800; color: #1f2937; display: block; margin-top: 2px; }
   .rname .free-mark { font-size: 14px; color: #ef6c00; font-weight: 800; }
+  .gate-badge {
+    display: inline-block;
+    background: #111827; color: #fff;
+    font-size: 16px; font-weight: 900;
+    border-radius: 6px; padding: 1px 10px; margin-left: 8px;
+    vertical-align: middle;
+  }
 
   .dfoot {
     margin-top: 12px; padding-top: 10px;
@@ -143,8 +150,10 @@
     ["福岡上8","17:20","18:50"],["和白下補助3上補助②","17:25","18:30"],["福岡中央下11上13","18:10","20:10"],
     ["和白下5上4","18:35","19:50"],["博多南下回送上8","18:40","20:20"],["福岡東下補助上2","18:45","19:40"],
     ["飯塚上3","18:45","20:10"],["博多北上9","19:10","20:00"],["福岡上14","19:45","21:15"],
-    ["直方下3上2","",""]
+    ["直方下3上2","",""],["フリー便","11:00","21:00"]
   ];
+  // ゲート車が必要な便（便名の右に「G」表示）
+  const GATE = new Set(['フリー便','城南下3上1','福岡下9上6','福岡上8','伊田下1','福間下補助','福岡中央下11上13']);
   // 1便分を {name,start,end} に展開（数値=規定便インデックス／配列=臨時便）
   function expandRoute(x) {
     if (Array.isArray(x)) return { name:x[0], start:x[1], end:x[2] };
@@ -183,19 +192,17 @@
         const { name, start, end, car } = x;
         const t = start ? `${start} 〜 ${end}` : '時間未定';
         const free = name.includes('フリー') ? '<span class="free-mark">（フリー）</span>' : '';
+        const gate = GATE.has(name) ? '<span class="gate-badge">G</span>' : '';
         // 乗り継ぎがある人は各便に車両を表示
         const carTag = (multiCar && car) ? `<span class="rcar">🚐 ${esc(car)}</span>` : '';
         return `<div class="rline">
           <span class="rnum">${'①②③④⑤⑥⑦⑧⑨⑩⑪⑫'[i] || '・'}</span>
           <span class="rbody">
             <span class="rtime">${esc(t)}${carTag}</span>
-            <span class="rname">${esc(name)}${free}</span>
+            <span class="rname">${esc(name)}${free}${gate}</span>
           </span>
         </div>`;
       }).join('');
-      const tLabel = it.isFree ? '🕐 拘束時間' : '🚌 運行時間';
-      const runTxt = it.runMin > 0
-        ? `${tLabel} ${Math.floor(it.runMin/60)}時間${String(it.runMin%60).padStart(2,'0')}分` : '';
       // 車両ラベル：1台ならそのまま、複数なら「3433 / 4786」
       const carHtml = it.cars.length
         ? `<span class="dcar">🚐 ${esc(it.cars.join(' / '))}</span>` : '';
@@ -205,7 +212,6 @@
           ${carHtml}
         </div>
         ${lines}
-        <div class="dfoot"><span class="runtime">${runTxt}</span></div>
       </div>`;
     }).join('');
   }

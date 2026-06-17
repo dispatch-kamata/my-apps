@@ -222,6 +222,12 @@
   .assign-route-line .num { color: var(--blue2); font-weight: 800; margin-right: 6px; flex-shrink: 0; }
   .assign-route-line .t { color: var(--gray); font-size: 12px; margin-right: 8px; flex-shrink: 0; }
   .assign-route-line .rinji-mark { color: var(--orange); font-size: 11px; font-weight: 800; margin-left: 4px; }
+  .gate-badge {
+    display: inline-block;
+    background: #111827; color: #fff;
+    font-size: 11px; font-weight: 900;
+    border-radius: 5px; padding: 1px 6px; margin-left: 6px;
+  }
   .assign-actions { margin-top: 6px; text-align: right; }
 
   /* 最下部フッター（運行時間＋手当 横並び） */
@@ -331,7 +337,7 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v1.8</span>
+  <span class="ver" id="verLabel">v1.9</span>
   <h1>🚌 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
@@ -436,7 +442,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '1.8';
+  const APP_VERSION = '1.9';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -476,8 +482,14 @@
     { name:'博多北上9',          start:'19:10', end:'20:00', allowance:3000, group:'evening' },
     { name:'福岡上14',           start:'19:45', end:'21:15', allowance:4000, group:'evening' },
     { name:'直方下3上2',         start:'',      end:'',      allowance:5000, group:'evening' },
+    { name:'フリー便',           start:'11:00', end:'21:00', allowance:9000, group:'day' },
   ];
   const MASTER_NAMES = new Set(ROUTE_MASTER.map(r => r.name));
+
+  // ゲート車が必要な便（便名の右に「G」表示）
+  const GATE_ROUTES = new Set([
+    'フリー便','城南下3上1','福岡下9上6','福岡上8','伊田下1','福間下補助','福岡中央下11上13'
+  ]);
 
   // ── ドライバー・車両DB（実績データから学習）──────────
   const DRIVER_SEED = ['本村','坂田','川原','後藤','辻','中村','藤','安河内','高瀬','清原','尾畑','取渕','久野','池田奥','日高','大石','酒井','古賀','新川','佐伯','宮本','百田'];
@@ -580,9 +592,11 @@
       return `<div class="group-title ${g.cls}">${g.label}</div>${btns}`;
     }).join('');
 
-    if (customRoutes.length) {
+    // 規定便に昇格した便（フリー便など）は臨時リストから除外
+    const customOnly = customRoutes.filter(r => !MASTER_NAMES.has(r.name));
+    if (customOnly.length) {
       html += `<div class="group-title" style="background:#f97316;">⚡ 臨時・増便（登録済み）</div>` +
-        customRoutes.map(r => btnHtml(r, true)).join('');
+        customOnly.map(r => btnHtml(r, true)).join('');
     }
     $('routeList').innerHTML = html;
   }
@@ -860,7 +874,7 @@
           return `<div class="assign-route-line ${lv}">
             <span class="num">${'①②③④⑤⑥⑦⑧'[i]||'・'}</span>
             <span class="t">${t}</span>
-            <span>${esc(r.name)}${r.rinji?'<span class="rinji-mark">⚡臨時</span>':''}${lv?' ⚠️':''}</span>
+            <span>${esc(r.name)}${GATE_ROUTES.has(r.name)?'<span class="gate-badge">G</span>':''}${r.rinji?'<span class="rinji-mark">⚡臨時</span>':''}${lv?' ⚠️':''}</span>
           </div>`;
         }).join('');
         const carLabel = it.car ? `🚐 ${esc(it.car)}` : '🚐 車両未設定';
