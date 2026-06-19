@@ -380,8 +380,8 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v2.3</span>
-  <h1>🚌 配車入力（試験版）</h1>
+  <span class="ver" id="verLabel">v2.4</span>
+  <h1>🚚 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
 
@@ -409,7 +409,7 @@
         <input type="text" id="fDriverNew" placeholder="新しい名前を入力" autocomplete="off" style="display:none;margin-top:8px;" />
       </div>
       <div>
-        <label class="lbl">🚐 車両ナンバー</label>
+        <label class="lbl">🚚 車両ナンバー</label>
         <div class="wheel-field"><div class="wheel" id="fCar"></div><div class="wheel-center"></div></div>
         <input type="text" id="fCarNew" placeholder="新しい番号（4桁）" inputmode="numeric" maxlength="4" pattern="\d*" autocomplete="off" style="display:none;margin-top:8px;" />
       </div>
@@ -487,7 +487,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '2.3';
+  const APP_VERSION = '2.4';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -690,8 +690,11 @@
       return `<div class="group-title ${g.cls}">${g.label}</div>${btns}`;
     }).join('');
 
-    // 規定便に昇格した便（フリー便など）は臨時リストから除外
-    const customOnly = customRoutes.filter(r => !MASTER_NAMES.has(r.name));
+    // 規定便に昇格した便（フリー便など）は臨時リストから除外し、時間順に整列
+    const customOnly = customRoutes
+      .filter(r => !MASTER_NAMES.has(r.name))
+      .slice()
+      .sort((a,b) => (toMin(a.start) - toMin(b.start)) || a.name.localeCompare(b.name,'ja'));
     if (customOnly.length) {
       html += `<div class="group-title" style="background:#f97316;">⚡ 臨時・増便（登録済み）</div>` +
         customOnly.map(r => btnHtml(r, true)).join('');
@@ -954,7 +957,7 @@
       if (worst) {
         const msgs = [];
         if (types.has('driver')) msgs.push('⏰ 運行時間が接近/重複');
-        if (types.has('car'))    msgs.push('🚐 車両が他と接近/重複');
+        if (types.has('car'))    msgs.push('🚚 車両が他と接近/重複');
         const head = worst === 'red' ? '⚠️ 重複しています' : '⚠️ 15分以内で接近';
         banner = `<div class="conflict-banner ${worst}">${head}：${msgs.join('　/　')}</div>`;
       }
@@ -981,7 +984,7 @@
             <span>${esc(r.name)}${GATE_ROUTES.has(r.name)?'<span class="gate-badge">G</span>':''}${TWOMAN_ROUTES.has(r.name)?'<span class="twoman-badge">👥2名</span>':''}${r.rinji?'<span class="rinji-mark">⚡臨時</span>':''}${lv?' ⚠️':''}</span>
           </div>`;
         }).join('');
-        const carLabel = it.car ? `🚐 ${esc(it.car)}` : '🚐 車両未設定';
+        const carLabel = it.car ? `🚚 ${esc(it.car)}` : '🚚 車両未設定';
         return `<div class="assign-sub">
           <div class="assign-sub-head">
             <span class="assign-car ${carLv||''}">${carLabel}</span>
@@ -997,7 +1000,7 @@
 
       const carCount = g.its.length > 1 ? `<span style="font-size:11px;color:var(--orange);font-weight:700;">🔁 ${g.its.length}台乗継</span>` : '';
       // フリー便は「拘束時間」、それ以外は「運行時間」
-      const tLabel = g.isFree ? '🕐 拘束時間' : '🚌 運行時間';
+      const tLabel = g.isFree ? '🕐 拘束時間' : '🚚 運行時間';
       const runLabel = g.runMin > 0
         ? `${tLabel} <b>${Math.floor(g.runMin/60)}時間${String(g.runMin%60).padStart(2,'0')}分</b>`
         : `${tLabel} —`;
@@ -1153,7 +1156,7 @@
   };
   // モーダル内のボタンは「新しいタップ」なのでiOSでも共有が動く
   $('modalShareBtn').onclick = () => {
-    const text = `🚌 ${$('fDate').value} の配車表`;
+    const text = `🚚 ${$('fDate').value} の配車表`;
     if (navigator.share) {
       navigator.share({ title:'配車表', text, url: currentShareUrl }).catch(() => {});
     } else copyShare();
