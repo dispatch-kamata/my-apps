@@ -389,7 +389,7 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v2.6</span>
+  <span class="ver" id="verLabel">v2.7</span>
   <h1>🚚 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
@@ -499,7 +499,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '2.6';
+  const APP_VERSION = '2.7';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -1085,15 +1085,26 @@
       assignments: data, customRoutes: customRoutes
     };
     const json = JSON.stringify(payload, null, 2);
-    if (navigator.share) {
-      const file = new File([json], `配車データ_master.json`, { type:'application/json' });
-      navigator.share({ files:[file], title:'配車データ' }).catch(() => copyJson(json));
-    } else copyJson(json);
+    const fname = '配車データ_master.json';
+    // iPhone等：共有シートでファイル保存（iCloud/ファイルアプリへ）
+    const file = new File([json], fname, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: '配車データ' })
+        .then(() => toast('📤 書き出したよ'))
+        .catch(() => downloadJson(json, fname));
+    } else {
+      // Windows/Mac等：ファイルとしてダウンロード保存
+      downloadJson(json, fname);
+    }
   };
-  function copyJson(json) {
-    navigator.clipboard.writeText(json)
-      .then(() => toast('📋 コピーしたよ！クロエに貼り付けてね'))
-      .catch(() => alert(json));
+  function downloadJson(json, fname) {
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('💾 ファイルに書き出したよ（ダウンロード）');
   }
 
   // ── JSON読み込み ──────────────────────────────────
