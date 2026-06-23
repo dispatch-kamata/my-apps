@@ -93,6 +93,9 @@
     border-top: 1.5px solid #c7d2fe; border-bottom: 1.5px solid #c7d2fe;
     background: rgba(99,102,241,.06); border-radius: 8px;
   }
+  .time-dial { display: flex; align-items: center; gap: 8px; }
+  .time-dial .wheel-field { flex: 1; }
+  .time-colon { font-size: 22px; font-weight: 800; color: #374151; }
 
   /* ── 便選択 ── */
   .group-title {
@@ -389,7 +392,7 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v3.4</span>
+  <span class="ver" id="verLabel">v3.5</span>
   <h1>🚚 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
@@ -437,14 +440,20 @@
         <label class="lbl">便名</label>
         <input type="text" id="rName" placeholder="例：福岡臨時下3" />
       </div>
-      <div class="row">
-        <div>
-          <label class="lbl">開始</label>
-          <input type="time" id="rStart" />
+      <div class="full">
+        <label class="lbl">開始（時：分のダイヤル）</label>
+        <div class="time-dial">
+          <div class="wheel-field"><div class="wheel" id="rStartH"></div><div class="wheel-center"></div></div>
+          <span class="time-colon">:</span>
+          <div class="wheel-field"><div class="wheel" id="rStartM"></div><div class="wheel-center"></div></div>
         </div>
-        <div>
-          <label class="lbl">終了</label>
-          <input type="time" id="rEnd" />
+      </div>
+      <div class="full">
+        <label class="lbl">終了（時：分のダイヤル）</label>
+        <div class="time-dial">
+          <div class="wheel-field"><div class="wheel" id="rEndH"></div><div class="wheel-center"></div></div>
+          <span class="time-colon">:</span>
+          <div class="wheel-field"><div class="wheel" id="rEndM"></div><div class="wheel-center"></div></div>
         </div>
       </div>
       <div class="full">
@@ -499,7 +508,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '3.4';
+  const APP_VERSION = '3.5';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -691,6 +700,32 @@
   attachWheel($('fDriver'), () => driverVals, 'fDriverNew');
   attachWheel($('fCar'), () => carVals, 'fCarNew');
 
+  // ── 臨時便の時間ダイヤル（時：分）──────────────────
+  const HOURS = Array.from({ length: 24 }, (_, i) => String(i));        // "0".."23"
+  const MINS  = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')); // "00".."59"
+  function attachTimeWheel(el) {
+    el._lastIdx = wheelIndex(el);
+    el.addEventListener('scroll', () => {
+      const idx = wheelIndex(el);
+      if (idx !== el._lastIdx) { el._lastIdx = idx; wheelHighlight(el); playTick(); }
+    });
+    el.addEventListener('click', e => {
+      const it = e.target.closest('.wheel-item'); if (!it) return;
+      const i = [...el.querySelectorAll('.wheel-item')].indexOf(it);
+      el.scrollTo({ top: i * WHEEL_ITEM, behavior: 'smooth' });
+    });
+  }
+  [['rStartH', HOURS], ['rStartM', MINS], ['rEndH', HOURS], ['rEndM', MINS]].forEach(([id, vals]) => {
+    buildWheel($(id), vals); attachTimeWheel($(id));
+  });
+  const getRStart = () => `${getWheelVal($('rStartH'), HOURS)}:${getWheelVal($('rStartM'), MINS)}`;
+  const getREnd   = () => `${getWheelVal($('rEndH'), HOURS)}:${getWheelVal($('rEndM'), MINS)}`;
+  function setRTime(hId, mId, str) {
+    const [h, m] = (str || '0:00').split(':');
+    setWheelVal($(hId), HOURS, String(Number(h) || 0));
+    setWheelVal($(mId), MINS, String(m || '0').padStart(2, '0'));
+  }
+
   function getDriver() { const v = getWheelVal($('fDriver'), driverVals); return v === NEW_VAL ? $('fDriverNew').value.trim() : String(v).trim(); }
   function getCar()    { const v = getWheelVal($('fCar'), carVals);       return v === NEW_VAL ? $('fCarNew').value.trim()    : String(v).trim(); }
   function setDriver(v) {
@@ -777,10 +812,10 @@
     if (!r) return;
     editingCustom = name;
     $('rName').value  = r.name;
-    $('rStart').value = r.start || '';
-    $('rEnd').value   = r.end || '';
     $('rAllow').value = r.allowance;
-    $('rinjiForm').classList.add('open');
+    $('rinjiForm').classList.add('open');     // 先に表示してからダイヤル位置をセット
+    setRTime('rStartH', 'rStartM', r.start || '0:00');
+    setRTime('rEndH', 'rEndM', r.end || '0:00');
     $('rinjiAdd').textContent = '✏️ この臨時便を更新';
     $('rinjiTitle').textContent = `✏️ 臨時便「${name}」を編集`;
     $('rName').scrollIntoView({ behavior:'smooth', block:'center' });
@@ -826,20 +861,20 @@
   // ── 臨時便フォーム ─────────────────────────────────
   function resetRinjiForm() {
     editingCustom = null;
-    $('rName').value = ''; $('rStart').value = ''; $('rEnd').value = ''; $('rAllow').value = '3000';
+    $('rName').value = ''; setRTime('rStartH','rStartM','0:00'); setRTime('rEndH','rEndM','0:00'); $('rAllow').value = '3000';
     $('rinjiAdd').textContent = 'この臨時便を選択に追加';
     $('rinjiTitle').textContent = '⚡ 臨時便・増便を登録';
   }
   $('rinjiToggle').onclick = () => {
     const willOpen = !$('rinjiForm').classList.contains('open');
-    if (willOpen) resetRinjiForm();
     $('rinjiForm').classList.toggle('open');
+    if (willOpen) resetRinjiForm();   // 表示後にダイヤルを初期位置へ
   };
   $('rinjiAdd').onclick = () => {
     const name = $('rName').value.trim();
     if (!name) { toast('臨時便の便名を入れてね'); return; }
     const route = {
-      name, start: $('rStart').value, end: $('rEnd').value,
+      name, start: getRStart(), end: getREnd(),
       allowance: Number($('rAllow').value) || 3000
     };
 
