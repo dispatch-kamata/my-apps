@@ -389,7 +389,7 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v2.7</span>
+  <span class="ver" id="verLabel">v2.9</span>
   <h1>🚚 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
@@ -409,7 +409,7 @@
   </div>
 
   <!-- 入力フォーム -->
-  <div class="card">
+  <div class="card" id="inputCard">
     <h2 id="formTitle">➕ 配車を追加</h2>
     <div class="row">
       <div>
@@ -499,7 +499,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '2.7';
+  const APP_VERSION = '2.9';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -552,11 +552,20 @@
   ]);
   // 同一車両を複数人で共有する便（重複として警告しない）
   const SHARED_RUN = new Set(['トーカイ','トーカイ2','トーカイ２']);
-  // ツーマン運行（👥2名と表示する便）— トーカイ2のみ
-  const TWOMAN_ROUTES = new Set(['トーカイ2','トーカイ２']);
+  // ツーマン運行（👥2名と表示する便）
+  const TWOMAN_ROUTES = new Set(['トーカイ','トーカイ2','トーカイ２']);
 
   // ── ドライバー・車両DB（実績データから学習）──────────
   const DRIVER_SEED = ['本村','坂田','川原','後藤','辻','中村','藤','安河内','高瀬','清原','尾畑','取渕','久野','池田奥','日高','大石','酒井','古賀','新川','佐伯','宮本','百田'];
+  // 名前の読み（あいうえお順の並べ替え用。読みが違う人がいたら教えてね）
+  const DRIVER_YOMI = {
+    '安河内':'やすこうち','池田奥':'いけだおく','大石':'おおいし','尾畑':'おばた',
+    '川原':'かわはら','清原':'きよはら','久野':'くの','古賀':'こが','後藤':'ごとう',
+    '酒井':'さかい','坂田':'さかた','佐伯':'さえき','新川':'しんかわ','高瀬':'たかせ',
+    '辻':'つじ','取渕':'とりぶち','中村':'なかむら','日高':'ひだか','百田':'ももた',
+    '藤':'ふじ','古賀2':'','本村':'もとむら','宮本':'みやもと'
+  };
+  const yomiKey = n => DRIVER_YOMI[n] || n;
   const CAR_SEED = ['79','1143','2502','2793','3409','3433','4625','4786','5025','7688','8288','9094','9660'];
 
   const $ = id => document.getElementById(id);
@@ -630,7 +639,7 @@
     }));
     const keepD = driverVals.length ? getWheelVal($('fDriver'), driverVals) : '';
     const keepC = carVals.length ? getWheelVal($('fCar'), carVals) : '';
-    driverVals = ['', ...[...drivers].sort((a,b)=>a.localeCompare(b,'ja')), NEW_VAL];
+    driverVals = ['', ...[...drivers].sort((a,b)=>yomiKey(a).localeCompare(yomiKey(b),'ja')), NEW_VAL];
     carVals    = ['', ...[...cars].sort((a,b)=>Number(a)-Number(b)), NEW_VAL];
     buildWheel($('fDriver'), driverVals);
     buildWheel($('fCar'), carVals);
@@ -638,16 +647,44 @@
     setWheelVal($('fCar'), carVals, carVals.includes(keepC) ? keepC : '');
   }
 
-  // スクロール後に中央の値を確定＆「新規入力」欄の出し入れ
+  // カリカリ音（ダイヤルが1つ進むたびに鳴らす）
+  let _ac;
+  function playTick() {
+    try {
+      _ac = _ac || new (window.AudioContext || window.webkitAudioContext)();
+      if (_ac.state === 'suspended') _ac.resume();
+      const o = _ac.createOscillator(), g = _ac.createGain();
+      o.type = 'square'; o.frequency.value = 900;
+      g.gain.value = 0.05;
+      o.connect(g); g.connect(_ac.destination);
+      const t = _ac.currentTime;
+      o.start(t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.025);
+      o.stop(t + 0.03);
+    } catch {}
+  }
+
   function attachWheel(el, getVals, newInputId) {
+    el._lastIdx = wheelIndex(el);
+    // スクロール中：1つ動くごとにハイライト更新＋カリカリ音
     el.addEventListener('scroll', () => {
+      const idx = wheelIndex(el);
+      if (idx !== el._lastIdx) { el._lastIdx = idx; wheelHighlight(el); playTick(); }
       clearTimeout(el._t);
       el._t = setTimeout(() => {
-        wheelHighlight(el);
         const v = getWheelVal(el, getVals());
         $(newInputId).style.display = (v === NEW_VAL) ? 'block' : 'none';
       }, 90);
     });
+    // PCのマウス/トラックパッド：1ノッチ＝1つだけ進める（重め・誤爆防止）
+    el.addEventListener('wheel', e => {
+      e.preventDefault();
+      if (el._wlock) return;
+      el._wlock = true; setTimeout(() => el._wlock = false, 110);
+      const max = el.querySelectorAll('.wheel-item').length - 1;
+      const next = Math.min(max, Math.max(0, wheelIndex(el) + (e.deltaY > 0 ? 1 : -1)));
+      el.scrollTo({ top: next * WHEEL_ITEM, behavior: 'smooth' });
+    }, { passive: false });
     el.addEventListener('click', e => {
       const it = e.target.closest('.wheel-item');
       if (!it) return;
@@ -869,6 +906,10 @@
       toast('💾 配車を保存したよ');
     }
     save(); clearForm(); renderAll();
+
+    // 保存後、入力欄（ドライバー名・車両のダイヤル）まで自動で戻る
+    const card = $('inputCard');
+    window.scrollTo({ top: Math.max(0, card.offsetTop - 64), behavior: 'smooth' });
 
     // 保存した配車が重複していたら警告
     const conf = detectDayConflicts(data[date] || []);

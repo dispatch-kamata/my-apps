@@ -104,6 +104,13 @@
     border-radius: 6px; padding: 1px 10px; margin-left: 8px;
     vertical-align: middle;
   }
+  .twoman-line {
+    margin-top: 8px;
+    background: #e0f2fe; color: #075985;
+    border-radius: 10px; padding: 8px 12px;
+    font-size: 16px; font-weight: 800;
+  }
+  .twoman-line b { font-size: 20px; margin-left: 6px; color: #0c4a6e; }
   .vbanner {
     font-size: 15px; font-weight: 800; line-height: 1.5;
     border-radius: 10px; padding: 11px 13px; margin: 4px 0 12px;
@@ -135,7 +142,7 @@
 </div>
 
 <div class="wrap" id="wrap">
-  <div class="safe-greet">🦺 今日もご安全に</div>
+  <div class="safe-greet" id="greet">🦺 今日もご安全に</div>
   <div class="empty" id="empty" style="display:none;">📭 表示する配車データがありません。<br>配車担当から送られた最新のリンクを開いてください。</div>
   <div id="list"></div>
   <div class="foot-note">この表は配車担当が作成したものです。<br>変更がある場合は担当者からの連絡を確認してください。</div>
@@ -182,8 +189,8 @@
   ];
   // ゲート車が必要な便（便名の右に「G」表示）
   const GATE = new Set(['フリー便','城南下3上1','福岡下9上6','福岡上8','伊田下1','福間下補助','福岡中央下11上13']);
-  // ツーマン運行（👥2名と表示する便）— トーカイ2のみ
-  const TWOMAN = new Set(['トーカイ2','トーカイ２']);
+  // ツーマン運行（2名で1便を担当・カードを統合し2名を表示）
+  const TWOMAN = new Set(['トーカイ','トーカイ2','トーカイ２']);
   // 同一車両を複数人で共有する便（重複として警告しない）
   const SHARED = new Set(['トーカイ','トーカイ2','トーカイ２']);
   // 1便分を {name,start,end} に展開（数値=規定便インデックス／配列=臨時便）
@@ -198,6 +205,20 @@
     document.getElementById('empty').style.display = 'block';
   } else {
     document.getElementById('dateLabel').textContent = formatDate(data.d);
+    // 曜日ごとの安全標語（日〜土で固定）
+    const SLOGANS = [
+      '🦺 今日もご安全に',
+      '🦺 今週も無事故でいきましょう',
+      '🦺 確認ヨシ！今日も安全運転で',
+      '🦺 焦らず慌てず、安全第一',
+      '🦺 疲れに注意、ゆとりの運転を',
+      '🦺 気を抜かず、最後まで安全に',
+      '🦺 一週間お疲れさま、安全運転で締めよう',
+    ];
+    if (data.d) {
+      const [yy,mm,dd] = data.d.split('-').map(Number);
+      document.getElementById('greet').textContent = SLOGANS[new Date(yy, mm-1, dd).getDay()];
+    }
     if (data.sf) {
       const sd = Math.max(0, Math.floor((Date.now() - new Date(data.sf + 'T00:00:00').getTime()) / 86400000));
       document.getElementById('vsafety').textContent = `🛡️ 無事故継続 ${sd}日`;
@@ -273,15 +294,19 @@
         const t = start ? `${start} 〜 ${end}` : '時間未定';
         const free = name.includes('フリー') ? '<span class="free-mark">（フリー）</span>' : '';
         const gate = GATE.has(name) ? '<span class="gate-badge">G</span>' : '';
-        const two  = partners && partners.length
-          ? `<span class="twoman-badge">👥 2名乗務：${esc(partners.join('・'))}</span>`
-          : (TWOMAN.has(name) ? '<span class="twoman-badge">👥 2名乗務</span>' : '');
+        // ツーマン：相方がいれば「主担当＋相方」を大きく1行で表示
+        const crewLine = (partners && partners.length)
+          ? `<div class="twoman-line">👥 ツーマン運行（2名）<b>${esc([it.n, ...partners].join('　・　'))}</b></div>`
+          : '';
+        const two = (!partners || !partners.length) && TWOMAN.has(name)
+          ? '<span class="twoman-badge">👥 2名乗務</span>' : '';
         const carTag = (multiCar && car) ? `<span class="rcar">🚚 ${esc(car)}</span>` : '';
         return `<div class="rline ${lv||''}">
           <span class="rnum">${'①②③④⑤⑥⑦⑧⑨⑩⑪⑫'[i] || '・'}</span>
           <span class="rbody">
             <span class="rtime">${esc(t)}${carTag}${lv?' ⚠️':''}</span>
             <span class="rname">${esc(name)}${free}${gate}${two}</span>
+            ${crewLine}
           </span>
         </div>`;
       }).join('');
