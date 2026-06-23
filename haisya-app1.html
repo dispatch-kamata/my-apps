@@ -389,7 +389,7 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v3.0</span>
+  <span class="ver" id="verLabel">v3.1</span>
   <h1>🚚 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
@@ -499,7 +499,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '3.0';
+  const APP_VERSION = '3.1';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -552,8 +552,8 @@
   ]);
   // 同一車両を複数人で共有する便（重複として警告しない）
   const SHARED_RUN = new Set(['トーカイ','トーカイ2','トーカイ２']);
-  // ツーマン運行（👥2名と表示する便）
-  const TWOMAN_ROUTES = new Set(['トーカイ','トーカイ2','トーカイ２']);
+  // ツーマン運行（👥2名と表示する便）— トーカイ2のみ（トーカイ無印は1名）
+  const TWOMAN_ROUTES = new Set(['トーカイ2','トーカイ２']);
 
   // ── ドライバー・車両DB（実績データから学習）──────────
   const DRIVER_SEED = ['本村','坂田','川原','後藤','辻','中村','藤','安河内','高瀬','清原','尾畑','取渕','久野','池田奥','日高','大石','酒井','古賀','新川','佐伯','宮本','百田'];
@@ -654,14 +654,14 @@
       _ac = _ac || new (window.AudioContext || window.webkitAudioContext)();
       if (_ac.state === 'suspended') _ac.resume();
       const t = _ac.currentTime;
-      // ごく短い減衰ノイズ＝機械的なクリック音
-      const dur = 0.013;
+      // ごく短い減衰ノイズ＝柔らかく小さなクリック音
+      const dur = 0.011;
       const buf = _ac.createBuffer(1, Math.max(1, Math.ceil(_ac.sampleRate * dur)), _ac.sampleRate);
       const d = buf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
       const src = _ac.createBufferSource(); src.buffer = buf;
-      const bp = _ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 1.2;
-      const g = _ac.createGain(); g.gain.value = 0.18;
+      const bp = _ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 0.8;
+      const g = _ac.createGain(); g.gain.value = 0.05;  // 小さめの音量
       src.connect(bp); bp.connect(g); g.connect(_ac.destination);
       src.start(t);
     } catch {}
