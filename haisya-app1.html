@@ -392,7 +392,7 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v3.6</span>
+  <span class="ver" id="verLabel">v3.7</span>
   <h1>🚚 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
@@ -513,7 +513,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '3.6';
+  const APP_VERSION = '3.7';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -1162,7 +1162,7 @@
   };
 
   // ── JSON書き出し（固定ファイル名で上書き運用）──────
-  $('exportBtn').onclick = () => {
+  $('exportBtn').onclick = async () => {
     const payload = {
       app: 'haisya-app1', version: 2,
       exported: new Date().toISOString(),
@@ -1170,14 +1170,28 @@
     };
     const json = JSON.stringify(payload, null, 2);
     const fname = '配車データ_master.json';
-    // iPhone等：共有シートでファイル保存（iCloud/ファイルアプリへ）
+    // ① Windows Chrome/Edge：保存先フォルダを選べるダイアログ
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: fname,
+          types: [{ description: 'JSONファイル', accept: { 'application/json': ['.json'] } }]
+        });
+        const w = await handle.createWritable();
+        await w.write(json); await w.close();
+        toast('💾 保存先を選んで保存したよ');
+      } catch (e) {
+        if (e.name !== 'AbortError') downloadJson(json, fname); // キャンセル以外は従来保存
+      }
+      return;
+    }
+    // ② iPhone：共有シート（iCloud/ファイル）／③ Mac等：ダウンロード（従来どおり）
     const file = new File([json], fname, { type: 'application/json' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       navigator.share({ files: [file], title: '配車データ' })
         .then(() => toast('📤 書き出したよ'))
         .catch(() => downloadJson(json, fname));
     } else {
-      // Windows/Mac等：ファイルとしてダウンロード保存
       downloadJson(json, fname);
     }
   };
