@@ -392,7 +392,7 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v3.5</span>
+  <span class="ver" id="verLabel">v3.6</span>
   <h1>🚚 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
@@ -440,20 +440,25 @@
         <label class="lbl">便名</label>
         <input type="text" id="rName" placeholder="例：福岡臨時下3" />
       </div>
-      <div class="full">
-        <label class="lbl">開始（時：分のダイヤル）</label>
-        <div class="time-dial">
-          <div class="wheel-field"><div class="wheel" id="rStartH"></div><div class="wheel-center"></div></div>
-          <span class="time-colon">:</span>
-          <div class="wheel-field"><div class="wheel" id="rStartM"></div><div class="wheel-center"></div></div>
+      <label class="rNoTime-row" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px;font-weight:700;color:#92400e;">
+        <input type="checkbox" id="rNoTime" style="width:auto;" /> ⏰ 時間未定（時間自由）にする
+      </label>
+      <div id="timeDialWrap">
+        <div class="full">
+          <label class="lbl">開始（時：分のダイヤル）</label>
+          <div class="time-dial">
+            <div class="wheel-field"><div class="wheel" id="rStartH"></div><div class="wheel-center"></div></div>
+            <span class="time-colon">:</span>
+            <div class="wheel-field"><div class="wheel" id="rStartM"></div><div class="wheel-center"></div></div>
+          </div>
         </div>
-      </div>
-      <div class="full">
-        <label class="lbl">終了（時：分のダイヤル）</label>
-        <div class="time-dial">
-          <div class="wheel-field"><div class="wheel" id="rEndH"></div><div class="wheel-center"></div></div>
-          <span class="time-colon">:</span>
-          <div class="wheel-field"><div class="wheel" id="rEndM"></div><div class="wheel-center"></div></div>
+        <div class="full">
+          <label class="lbl">終了（時：分のダイヤル）</label>
+          <div class="time-dial">
+            <div class="wheel-field"><div class="wheel" id="rEndH"></div><div class="wheel-center"></div></div>
+            <span class="time-colon">:</span>
+            <div class="wheel-field"><div class="wheel" id="rEndM"></div><div class="wheel-center"></div></div>
+          </div>
         </div>
       </div>
       <div class="full">
@@ -508,7 +513,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '3.5';
+  const APP_VERSION = '3.6';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -565,13 +570,13 @@
   const TWOMAN_ROUTES = new Set(['トーカイ2','トーカイ２']);
 
   // ── ドライバー・車両DB（実績データから学習）──────────
-  const DRIVER_SEED = ['本村','坂田','川原','後藤','辻','中村','藤','安河内','高瀬','清原','尾畑','取渕','久野','池田奥','日高','大石','酒井','古賀','新川','佐伯','宮本','百田'];
+  const DRIVER_SEED = ['本村','坂田','川原','後藤','辻','中村','藤','安河内','高瀬','清原','尾畑','取渕','久野','池田奥','日高','大石','酒井','古賀','新川','佐伯','宮本','百田','柴田'];
   // 名前の読み（あいうえお順の並べ替え用。読みが違う人がいたら教えてね）
   const DRIVER_YOMI = {
     '安河内':'やすこうち','池田奥':'いけだおく','大石':'おおいし','尾畑':'おばた',
     '川原':'かわはら','清原':'きよはら','久野':'くの','古賀':'こが','後藤':'ごとう',
     '酒井':'さかい','坂田':'さかた','佐伯':'さえき','新川':'しんかわ','高瀬':'たかせ',
-    '辻':'つじ','取渕':'とりぶち','中村':'なかむら','日高':'ひだか','百田':'ももた',
+    '辻':'つじ','取渕':'とりぶち','中村':'なかむら','日高':'ひだか','百田':'ももた','柴田':'しばた',
     '藤':'ふじ','古賀2':'','本村':'もとむら','宮本':'みやもと'
   };
   const yomiKey = n => DRIVER_YOMI[n] || n;
@@ -718,8 +723,10 @@
   [['rStartH', HOURS], ['rStartM', MINS], ['rEndH', HOURS], ['rEndM', MINS]].forEach(([id, vals]) => {
     buildWheel($(id), vals); attachTimeWheel($(id));
   });
-  const getRStart = () => `${getWheelVal($('rStartH'), HOURS)}:${getWheelVal($('rStartM'), MINS)}`;
-  const getREnd   = () => `${getWheelVal($('rEndH'), HOURS)}:${getWheelVal($('rEndM'), MINS)}`;
+  // 時間未定チェックで時間ダイヤルを隠す／値は空にする
+  $('rNoTime').onchange = () => { $('timeDialWrap').style.display = $('rNoTime').checked ? 'none' : 'block'; };
+  const getRStart = () => $('rNoTime').checked ? '' : `${getWheelVal($('rStartH'), HOURS)}:${getWheelVal($('rStartM'), MINS)}`;
+  const getREnd   = () => $('rNoTime').checked ? '' : `${getWheelVal($('rEndH'), HOURS)}:${getWheelVal($('rEndM'), MINS)}`;
   function setRTime(hId, mId, str) {
     const [h, m] = (str || '0:00').split(':');
     setWheelVal($(hId), HOURS, String(Number(h) || 0));
@@ -755,7 +762,8 @@
 
     const btnHtml = (r, isCustom) => {
       const sel  = selNames.has(r.name);
-      const used = usedNames.has(r.name);
+      // ツーマン便（トーカイ2など）は2人選べるよう「配車済」で薄くしない
+      const used = usedNames.has(r.name) && !TWOMAN_ROUTES.has(r.name);
       const aCls = r.allowance >= 5000 ? 'a5000' : r.allowance >= 4000 ? 'a4000' : '';
       const time = r.start ? `${r.start}〜${r.end}` : '時間自由';
       const del  = isCustom ? `<span onclick="event.stopPropagation();editCustom('${esc(r.name)}')" style="font-size:13px;color:var(--blue2);padding:4px 6px;font-weight:700;">✏️</span><span onclick="event.stopPropagation();delCustom('${esc(r.name)}')" style="font-size:12px;color:#9ca3af;padding:4px 6px;">✕</span>` : '';
@@ -814,6 +822,9 @@
     $('rName').value  = r.name;
     $('rAllow').value = r.allowance;
     $('rinjiForm').classList.add('open');     // 先に表示してからダイヤル位置をセット
+    const noTime = !r.start && !r.end;
+    $('rNoTime').checked = noTime;
+    $('timeDialWrap').style.display = noTime ? 'none' : 'block';
     setRTime('rStartH', 'rStartM', r.start || '0:00');
     setRTime('rEndH', 'rEndM', r.end || '0:00');
     $('rinjiAdd').textContent = '✏️ この臨時便を更新';
@@ -861,7 +872,8 @@
   // ── 臨時便フォーム ─────────────────────────────────
   function resetRinjiForm() {
     editingCustom = null;
-    $('rName').value = ''; setRTime('rStartH','rStartM','0:00'); setRTime('rEndH','rEndM','0:00'); $('rAllow').value = '3000';
+    $('rName').value = ''; $('rNoTime').checked = false; $('timeDialWrap').style.display = 'block';
+    setRTime('rStartH','rStartM','0:00'); setRTime('rEndH','rEndM','0:00'); $('rAllow').value = '3000';
     $('rinjiAdd').textContent = 'この臨時便を選択に追加';
     $('rinjiTitle').textContent = '⚡ 臨時便・増便を登録';
   }
