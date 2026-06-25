@@ -298,6 +298,14 @@
     -webkit-tap-highlight-color: transparent;
   }
   .share-btn:disabled { opacity: .6; }
+  .preview-btn {
+    display: block; width: 100%;
+    padding: 14px; margin-bottom: 8px;
+    border: none; border-radius: 14px;
+    background: #ef6c00; color: #fff;
+    font: inherit; font-size: 15px; font-weight: 800;
+    -webkit-tap-highlight-color: transparent;
+  }
 
   /* 共有モーダル */
   .modal-overlay {
@@ -392,7 +400,7 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v3.7</span>
+  <span class="ver" id="verLabel">v3.8</span>
   <h1>🚚 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
@@ -483,7 +491,8 @@
     <div class="stat money-stat"><small>手当合計</small><strong id="sAllow">🔒</strong></div>
   </div>
 
-  <button class="share-btn" id="shareViewBtn">📲 ドライバー用ページを作成（LINE共有）</button>
+  <button class="preview-btn" id="previewViewBtn">👁 配車ビューを確認（プレビュー）</button>
+  <button class="share-btn" id="shareViewBtn">📲 確認OK → LINEで共有する</button>
 
   <h2 style="font-size:15px;font-weight:800;margin:4px 0 10px;">📋 この日の配車一覧</h2>
   <div id="list"></div>
@@ -513,7 +522,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '3.7';
+  const APP_VERSION = '3.8';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -1272,6 +1281,12 @@
   }
 
   let currentShareUrl = '';
+  // 👁 確認プレビュー：実際のドライバー用ビューを新しいタブで開く（共有はしない）
+  $('previewViewBtn').onclick = () => {
+    if (!dayItems().length) { toast('この日の配車がまだないよ'); return; }
+    window.open(buildViewURL(), '_blank');
+  };
+
   $('shareViewBtn').onclick = async () => {
     if (!dayItems().length) { toast('この日の配車がまだないよ'); return; }
     const btn = $('shareViewBtn');

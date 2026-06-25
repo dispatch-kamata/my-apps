@@ -233,7 +233,7 @@
     data.a.forEach(a => a.r.forEach(rr => {
       const r = expandRoute(rr);
       flat.push({ n:a.n, car:a.c, name:r.name, start:r.start, end:r.end,
-                  s:toMin(r.start), e:toMin(r.end), lv:null, partners:null });
+                  s:toMin(r.start), e:toMin(r.end), lv:null, types:new Set(), partners:null });
     }));
 
     // ツーマン（トーカイ2）統合：同じ便・同時刻を主担当1人にまとめ、相方を表示
@@ -263,6 +263,8 @@
         const lv = ov>15 ? 'red' : ov>-15 ? 'yellow' : null;
         if (!lv) continue;
         [a,b].forEach(x => { if (lv==='red' || x.lv!=='red') x.lv = lv; });
+        if (sameDriver) { a.types.add('driver'); b.types.add('driver'); }
+        if (sameCar)    { a.types.add('car');    b.types.add('car'); }
       }
     }
 
@@ -275,9 +277,9 @@
       const cars = [...new Set(routes.map(r => r.car).filter(Boolean))];
       const minS = Math.min(...routes.map(r => r.s));
       const isFree = routes.some(r => r.name.includes('フリー'));
-      let worst = null;
-      routes.forEach(r => { if (r.lv && (r.lv==='red' || worst!=='red')) worst = r.lv; });
-      return { n, cars, routes, minS, isFree, worst };
+      let worst = null; const gtypes = new Set();
+      routes.forEach(r => { if (r.lv) { if (r.lv==='red' || worst!=='red') worst = r.lv; r.types.forEach(t=>gtypes.add(t)); } });
+      return { n, cars, routes, minS, isFree, worst, gtypes };
     });
     arr.sort((a,b) => (a.isFree !== b.isFree) ? (a.isFree ? -1 : 1) : a.minS - b.minS);
 
@@ -285,10 +287,15 @@
       const multiCar = it.cars.length > 1;
       // やさしめの注意文（成立する運行だが念のため）
       let banner = '';
-      if (it.worst === 'red') {
-        banner = `<div class="vbanner red">🙏 運行時間が重なっています。慎重に運行し、遅れそうな場合はすぐ輸送へご連絡ください</div>`;
-      } else if (it.worst === 'yellow') {
-        banner = `<div class="vbanner yellow">🙏 運行の間隔が15分以内に接近しています。お気をつけてお願いします</div>`;
+      if (it.worst) {
+        const msgs = [];
+        if (it.gtypes.has('car'))    msgs.push('🚚 同じ車両が別の運行と重なっています');
+        if (it.gtypes.has('driver')) msgs.push('⏰ 運行時間が重なっています');
+        const head = msgs.join(' ／ ');
+        const tail = it.worst === 'red'
+          ? '慎重に確認し、調整が必要な場合はすぐ輸送へご連絡ください'
+          : '15分以内に接近しています。お気をつけてお願いします';
+        banner = `<div class="vbanner ${it.worst}">🙏 ${head}。${tail}</div>`;
       }
       const lines = it.routes.map((x, i) => {
         const { name, start, end, car, lv, partners } = x;
