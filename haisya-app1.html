@@ -400,7 +400,7 @@
 <body>
 
 <div class="header">
-  <span class="ver" id="verLabel">v3.8</span>
+  <span class="ver" id="verLabel">v3.9</span>
   <h1>🚚 配車入力（試験版）</h1>
   <p>便をタップして選ぶだけ・データはこの端末に保存</p>
 </div>
@@ -522,7 +522,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const APP_VERSION = '3.8';
+  const APP_VERSION = '3.9';
   const STORAGE_KEY = 'haisya_trial_v1';
   const CUSTOM_KEY  = 'haisya_custom_routes_v1';
 
@@ -1008,12 +1008,16 @@
         const sameCar    = a.it.car && a.it.car === b.it.car;
         if (!sameDriver && !sameCar) continue;
         const overlap = Math.min(a.e, b.e) - Math.max(a.s, b.s); // 正=重なり/負=間隔
-        let level = null;
-        if (overlap > 15) level = 'red';        // 15分超の重なり=重大
-        else if (overlap > -15) level = 'yellow'; // 重なり〜15分 or 間隔15分未満=要注意
-        if (!level) continue;
-        if (sameDriver) { add(a.r, level, 'driver'); add(b.r, level, 'driver'); }
-        if (sameCar)    { add(a.r, level, 'car');    add(b.r, level, 'car'); }
+        // ドライバー：重なり>15=赤／重なり〜間隔15分以内=黄（移動の余裕）
+        if (sameDriver) {
+          const lv = overlap > 15 ? 'red' : overlap > -15 ? 'yellow' : null;
+          if (lv) { add(a.r, lv, 'driver'); add(b.r, lv, 'driver'); }
+        }
+        // 車両：実際に時間が重なる時だけ（間隔があるのは正常なので警告しない）
+        if (sameCar) {
+          const lv = overlap > 15 ? 'red' : overlap > 0 ? 'yellow' : null;
+          if (lv) { add(a.r, lv, 'car'); add(b.r, lv, 'car'); }
+        }
       }
     }
     return map;

@@ -233,7 +233,7 @@
     data.a.forEach(a => a.r.forEach(rr => {
       const r = expandRoute(rr);
       flat.push({ n:a.n, car:a.c, name:r.name, start:r.start, end:r.end,
-                  s:toMin(r.start), e:toMin(r.end), lv:null, types:new Set(), partners:null });
+                  s:toMin(r.start), e:toMin(r.end), lv:null, tlv:{}, partners:null });
     }));
 
     // ツーマン（トーカイ2）統合：同じ便・同時刻を主担当1人にまとめ、相方を表示
@@ -250,7 +250,13 @@
     });
     flat = flat.filter(o => !drop.has(o));
 
-    // 重複検出：重なり>15分=赤／重なり〜間隔15分以内=黄（共有便は除外）
+    // 重複検出
+    //   ドライバー：重なり>15分=赤／重なり〜間隔15分以内=黄（移動時間の余裕）
+    //   車両：実際に時間が重なった時だけ（>15分=赤／0〜15分=黄）。間隔があるのは正常なので警告しない
+    const bump = (x, key, lv) => {
+      if (!x.tlv[key] || lv==='red') x.tlv[key] = lv;
+      if (lv==='red' || x.lv!=='red') x.lv = lv;
+    };
     for (let i=0; i<flat.length; i++) {
       for (let j=i+1; j<flat.length; j++) {
         const a=flat[i], b=flat[j];
@@ -259,12 +265,15 @@
         const sameDriver = a.n===b.n;
         const sameCar = a.car && a.car===b.car;
         if (!sameDriver && !sameCar) continue;
-        const ov = Math.min(a.e,b.e) - Math.max(a.s,b.s);
-        const lv = ov>15 ? 'red' : ov>-15 ? 'yellow' : null;
-        if (!lv) continue;
-        [a,b].forEach(x => { if (lv==='red' || x.lv!=='red') x.lv = lv; });
-        if (sameDriver) { a.types.add('driver'); b.types.add('driver'); }
-        if (sameCar)    { a.types.add('car');    b.types.add('car'); }
+        const ov = Math.min(a.e,b.e) - Math.max(a.s,b.s);   // 正=重なり / 負=間隔
+        if (sameDriver) {
+          const lv = ov>15 ? 'red' : ov>-15 ? 'yellow' : null;
+          if (lv) { bump(a,'driver',lv); bump(b,'driver',lv); }
+        }
+        if (sameCar) {
+          const lv = ov>15 ? 'red' : ov>0 ? 'yellow' : null;   // 実際に重なる時だけ
+          if (lv) { bump(a,'car',lv); bump(b,'car',lv); }
+        }
       }
     }
 
@@ -277,9 +286,12 @@
       const cars = [...new Set(routes.map(r => r.car).filter(Boolean))];
       const minS = Math.min(...routes.map(r => r.s));
       const isFree = routes.some(r => r.name.includes('フリー'));
-      let worst = null; const gtypes = new Set();
-      routes.forEach(r => { if (r.lv) { if (r.lv==='red' || worst!=='red') worst = r.lv; r.types.forEach(t=>gtypes.add(t)); } });
-      return { n, cars, routes, minS, isFree, worst, gtypes };
+      let worst = null; const gl = { driver:null, car:null };
+      routes.forEach(r => {
+        if (r.lv && (r.lv==='red' || worst!=='red')) worst = r.lv;
+        ['driver','car'].forEach(k => { if (r.tlv[k] && (r.tlv[k]==='red' || gl[k]!=='red')) gl[k] = r.tlv[k]; });
+      });
+      return { n, cars, routes, minS, isFree, worst, gl };
     });
     arr.sort((a,b) => (a.isFree !== b.isFree) ? (a.isFree ? -1 : 1) : a.minS - b.minS);
 
@@ -289,13 +301,12 @@
       let banner = '';
       if (it.worst) {
         const msgs = [];
-        if (it.gtypes.has('car'))    msgs.push('🚚 同じ車両が別の運行と重なっています');
-        if (it.gtypes.has('driver')) msgs.push('⏰ 運行時間が重なっています');
-        const head = msgs.join(' ／ ');
+        if (it.gl.car)    msgs.push(it.gl.car==='red'    ? '🚚 同じ車両が別の運行と時間が重なっています' : '🚚 同じ車両の時間が少し重なっています');
+        if (it.gl.driver) msgs.push(it.gl.driver==='red' ? '⏰ 運行時間が重なっています' : '⏰ 運行の間隔が15分以内です');
         const tail = it.worst === 'red'
           ? '慎重に確認し、調整が必要な場合はすぐ輸送へご連絡ください'
-          : '15分以内に接近しています。お気をつけてお願いします';
-        banner = `<div class="vbanner ${it.worst}">🙏 ${head}。${tail}</div>`;
+          : 'お気をつけてお願いします';
+        banner = `<div class="vbanner ${it.worst}">🙏 ${msgs.join(' ／ ')}。${tail}</div>`;
       }
       const lines = it.routes.map((x, i) => {
         const { name, start, end, car, lv, partners } = x;
